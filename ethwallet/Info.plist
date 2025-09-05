@@ -2,9 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>需要使用蓝牙来模拟 BLE 外设，用于 Web Bluetooth 调试</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>需要使用蓝牙外设功能来与 Web 浏览器进行通信</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>bluetooth-peripheral</string>
 	</array>
 </dict>
 </plist>

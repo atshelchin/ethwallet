@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Bluetooth 调试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            animation: fadeInDown 0.5s ease;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .control-group input[type="text"],
+        .control-group input[type="number"],
+        .control-group select,
+        .control-group textarea {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .control-group input:focus,
+        .control-group select:focus,
+        .control-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .control-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .btn-danger {
+            background: #ff4757;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff3838;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-connected {
+            background: #10b981;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+        }
+
+        .status-scanning {
+            background: #f59e0b;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .console {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .console-line {
+            color: #00ff00;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            margin: 5px 0;
+            word-wrap: break-word;
+        }
+
+        .console-line.error {
+            color: #ff4757;
+        }
+
+        .console-line.info {
+            color: #3498db;
+        }
+
+        .console-line.warning {
+            color: #f59e0b;
+        }
+
+        .device-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .device-info p {
+            margin: 8px 0;
+            color: #555;
+        }
+
+        .device-info strong {
+            color: #333;
+            margin-right: 10px;
+        }
+
+        .data-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .data-item {
+            background: #f0f4f8;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .data-item .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .data-item .value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔷 Web Bluetooth 调试工具</h1>
+            <p>专业的蓝牙设备调试与测试平台</p>
+        </div>
+
+        <div class="main-content">
+            <!-- 连接控制面板 -->
+            <div class="card">
+                <h2>📡 设备连接</h2>
+                
+                <div class="control-group">
+                    <div style="padding: 15px; background: linear-gradient(135deg, #f0f8ff, #e6f3ff); border-radius: 10px; border-left: 4px solid #667eea;">
+                        <p style="margin: 0 0 5px 0; color: #333; font-weight: 500;">💡 使用说明</p>
+                        <small style="color: #555; line-height: 1.6;">
+                            • 点击扫描按钮显示所有附近的蓝牙设备<br>
+                            • iOS 设备显示系统设置中的名称 (如 "shelchin's iPhone")<br>
+                            • 此名称在 iOS 设置 > 通用 > 关于本机 > 名称 中配置<br>
+                            • 选择设备后自动发现所有可用服务<br>
+                            • 如果无法发现服务，请从 iOS 应用复制服务 UUID
+                        </small>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>服务 UUID（可选）</label>
+                    <input type="text" id="serviceUuid" placeholder="从 iOS 应用复制 UUID，或留空自动扫描" value="">
+                    <small style="color: #999;">提示：如果无法发现服务，请输入 iOS 应用显示的服务 UUID</small>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" id="scanBtn">
+                        <span id="scanBtnText">扫描设备</span>
+                    </button>
+                    <button class="btn btn-secondary" id="refreshServicesBtn" disabled>
+                        刷新服务
+                    </button>
+                    <button class="btn btn-danger" id="disconnectBtn" disabled>
+                        断开连接
+                    </button>
+                </div>
+
+                <div class="device-info" id="deviceInfo" style="display: none;">
+                    <p><strong>状态：</strong> <span class="status-indicator" id="statusIndicator"></span><span id="connectionStatus">未连接</span></p>
+                    <p><strong>设备名称：</strong> <span id="deviceName">-</span></p>
+                    <p><strong>设备 ID:</strong> <span id="deviceId">-</span></p>
+                    <p><strong>RSSI:</strong> <span id="rssi">-</span> dBm</p>
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px; color: #333;">📊 服务与特征</h3>
+                <div id="servicesContainer" style="margin-top: 15px;">
+                    <p style="color: #999;">请先连接设备</p>
+                </div>
+            </div>
+
+            <!-- 数据交互面板 -->
+            <div class="card">
+                <h2>📤 数据交互</h2>
+                
+                <div class="control-group">
+                    <label>特征 UUID</label>
+                    <select id="characteristicSelect" disabled>
+                        <option value="">请先连接设备</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>发送数据（HEX 或文本）</label>
+                    <textarea id="sendData" placeholder="输入要发送的数据..." disabled></textarea>
+                </div>
+
+                <div class="control-group">
+                    <label>数据格式</label>
+                    <select id="dataFormat">
+                        <option value="text">文本（UTF-8）</option>
+                        <option value="hex">十六进制</option>
+                        <option value="json">JSON</option>
+                        <option value="binary">二进制</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" id="writeBtn" disabled>写入数据</button>
+                    <button class="btn btn-secondary" id="readBtn" disabled>读取数据</button>
+                    <button class="btn btn-secondary" id="subscribeBtn" disabled>订阅通知</button>
+                    <button class="btn btn-secondary" id="clearConsoleBtn">清空控制台</button>
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px; color: #333;">📈 实时数据</h3>
+                <div class="data-display" id="realtimeData">
+                    <div class="data-item">
+                        <div class="label">接收字节</div>
+                        <div class="value" id="bytesReceived">0</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">发送字节</div>
+                        <div class="value" id="bytesSent">0</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">通知数量</div>
+                        <div class="value" id="notificationCount">0</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="label">错误数量</div>
+                        <div class="value" id="errorCount">0</div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px; color: #333;">💻 调试控制台</h3>
+                <div class="console" id="console"></div>
+            </div>
+        </div>
+
+        <!-- 高级功能 -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>🔧 高级功能</h2>
+            
+            <div class="button-group">
+                <button class="btn btn-secondary" id="getAllServicesBtn" disabled>获取所有服务</button>
+                <button class="btn btn-secondary" id="getAllCharacteristicsBtn" disabled>获取所有特征</button>
+                <button class="btn btn-secondary" id="testPerformanceBtn" disabled>性能测试</button>
+                <button class="btn btn-secondary" id="exportLogsBtn">导出日志</button>
+            </div>
+
+            <div class="control-group" style="margin-top: 20px;">
+                <label>批量测试命令（每行一条）</label>
+                <textarea id="batchCommands" placeholder="WRITE:12345678-1234-5678-1234-56789abcdef1:Hello&#10;READ:12345678-1234-5678-1234-56789abcdef2&#10;WAIT:1000&#10;NOTIFY:12345678-1234-5678-1234-56789abcdef3"></textarea>
+                <button class="btn btn-primary" id="runBatchBtn" disabled style="margin-top: 10px;">执行批量测试</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class BluetoothDebugger {
+            constructor() {
+                this.device = null;
+                this.server = null;
+                this.services = new Map();
+                this.characteristics = new Map();
+                this.stats = {
+                    bytesReceived: 0,
+                    bytesSent: 0,
+                    notificationCount: 0,
+                    errorCount: 0
+                };
+                this.logs = [];
+                this.autoReconnect = true;
+                this.reconnectTimer = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 10;
+                this.lastHeartbeat = Date.now();
+                this.heartbeatCheckTimer = null;
+                this.initializeUI();
+            }
+
+            initializeUI() {
+                // 绑定事件处理器
+                document.getElementById('scanBtn').addEventListener('click', () => this.scanDevice());
+                document.getElementById('disconnectBtn').addEventListener('click', () => this.disconnect());
+                document.getElementById('refreshServicesBtn').addEventListener('click', () => this.discoverServices());
+                document.getElementById('writeBtn').addEventListener('click', () => this.writeData());
+                document.getElementById('readBtn').addEventListener('click', () => this.readData());
+                document.getElementById('subscribeBtn').addEventListener('click', () => this.subscribeToNotifications());
+                document.getElementById('clearConsoleBtn').addEventListener('click', () => this.clearConsole());
+                document.getElementById('getAllServicesBtn').addEventListener('click', () => this.getAllServices());
+                document.getElementById('getAllCharacteristicsBtn').addEventListener('click', () => this.getAllCharacteristics());
+                document.getElementById('testPerformanceBtn').addEventListener('click', () => this.performanceTest());
+                document.getElementById('exportLogsBtn').addEventListener('click', () => this.exportLogs());
+                document.getElementById('runBatchBtn').addEventListener('click', () => this.runBatchCommands());
+
+                // 检查浏览器支持
+                if (!navigator.bluetooth) {
+                    this.log('Web Bluetooth API 不支持！请使用 Chrome 浏览器', 'error');
+                    this.disableAllButtons();
+                } else {
+                    this.log('Web Bluetooth 调试工具已就绪', 'info');
+                }
+            }
+
+            async scanDevice() {
+                try {
+                    this.log('开始扫描蓝牙设备...', 'info');
+                    
+                    const serviceUuid = document.getElementById('serviceUuid').value.trim();
+                    
+                    // 扫描选项 - 接受所有设备
+                    let options = {
+                        acceptAllDevices: true,
+                        optionalServices: []
+                    };
+                    
+                    // 如果提供了服务 UUID，添加到 optionalServices
+                    if (serviceUuid) {
+                        try {
+                            // 验证 UUID 格式
+                            const uuid = serviceUuid.toLowerCase();
+                            options.optionalServices.push(uuid);
+                            this.log(`已添加服务 UUID: ${uuid}`, 'info');
+                        } catch (e) {
+                            this.log(`UUID 格式错误：${serviceUuid}`, 'warning');
+                        }
+                    }
+                    
+                    this.log('扫描选项：接受所有设备', 'info');
+
+                    this.device = await navigator.bluetooth.requestDevice(options);
+                    
+                    this.log(`已选择设备：${this.device.name || 'Unknown'}`, 'info');
+                    
+                    // 监听断开事件
+                    this.device.addEventListener('gattserverdisconnected', () => {
+                        this.log('设备断开连接', 'warning');
+                        this.onDisconnected();
+                        
+                        // 自动重连
+                        if (this.autoReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+                            this.attemptReconnect();
+                        }
+                    });
+
+                    await this.connectToDevice();
+                    
+                } catch (error) {
+                    this.log(`扫描失败：${error.message}`, 'error');
+                    this.stats.errorCount++;
+                    this.updateStats();
+                }
+            }
+
+            async connectToDevice() {
+                try {
+                    this.log('正在连接到 GATT 服务器...', 'info');
+                    this.server = await this.device.gatt.connect();
+                    
+                    this.log('已连接到 GATT 服务器', 'info');
+                    this.log(`设备信息：ID=${this.device.id}, Name=${this.device.name}`, 'info');
+                    this.updateConnectionStatus(true);
+                    
+                    // 延迟一下再发现服务
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // 自动发现服务
+                    await this.discoverServices();
+                    
+                } catch (error) {
+                    this.log(`连接失败：${error.message}`, 'error');
+                    this.stats.errorCount++;
+                    this.updateStats();
+                }
+            }
+
+            async discoverServices() {
+                try {
+                    this.log('正在发现服务...', 'info');
+                    
+                    // 检查连接状态
+                    if (!this.server || !this.device.gatt.connected) {
+                        this.log('设备未连接，尝试重新连接...', 'warning');
+                        try {
+                            this.server = await this.device.gatt.connect();
+                            this.log('重新连接成功', 'info');
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        } catch (e) {
+                            this.log('重新连接失败：' + e.message, 'error');
+                            return;
+                        }
+                    }
+                    
+                    let services = [];
+                    const serviceUuid = document.getElementById('serviceUuid').value.trim();
+                    
+                    // 如果提供了服务 UUID，先尝试获取特定服务
+                    if (serviceUuid) {
+                        try {
+                            this.log(`尝试获取指定服务：${serviceUuid}`, 'info');
+                            const service = await this.server.getPrimaryService(serviceUuid.toLowerCase());
+                            services = [service];
+                            this.log(`✅ 成功获取服务：${service.uuid}`, 'success');
+                        } catch (e) {
+                            this.log(`无法获取指定服务：${e.message}`, 'warning');
+                            // 继续尝试获取所有服务
+                        }
+                    }
+                    
+                    // 如果没有获取到服务，尝试获取所有服务
+                    if (services.length === 0) {
+                        try {
+                            this.log('尝试获取所有可用服务...', 'info');
+                            services = await this.server.getPrimaryServices();
+                            this.log(`发现 ${services.length} 个服务`, 'info');
+                            
+                            if (services.length === 0) {
+                                this.log('⚠️ 没有发现任何服务！', 'warning');
+                                this.log('解决方案：', 'info');
+                                this.log('  1. 从 iOS 应用复制服务 UUID', 'info');
+                                this.log('  2. 将 UUID 粘贴到上方输入框', 'info');
+                                this.log('  3. 重新扫描并连接设备', 'info');
+                            } else {
+                                this.log('服务列表：', 'info');
+                                for (const s of services) {
+                                    this.log(`  📦 服务 UUID: ${s.uuid}`, 'info');
+                                }
+                            }
+                        } catch (e) {
+                            this.log(`获取服务失败：${e.message}`, 'error');
+                            this.log('💡 请从 iOS 应用复制服务 UUID 并重新扫描', 'warning');
+                            services = [];
+                        }
+                    }
+                    
+                    this.services.clear();
+                    this.characteristics.clear();
+                    
+                    const servicesContainer = document.getElementById('servicesContainer');
+                    servicesContainer.innerHTML = '';
+                    
+                    const characteristicSelect = document.getElementById('characteristicSelect');
+                    characteristicSelect.innerHTML = '<option value="">选择特征</option>';
+                    
+                    for (const service of services) {
+                    console.log({services})
+                        this.services.set(service.uuid, service);
+                        this.log(`发现服务：${service.uuid}`, 'info');
+                        
+                        const serviceDiv = document.createElement('div');
+                        serviceDiv.style.marginBottom = '15px';
+                        serviceDiv.innerHTML = `<strong>服务:</strong> ${service.uuid}`;
+                        servicesContainer.appendChild(serviceDiv);
+                        
+                        try {
+                            // 尝试获取所有特征
+                            this.log(`正在获取服务 ${service.uuid} 的特征...`, 'info');
+                            const characteristics = await service.getCharacteristics();
+                            this.log(`服务 ${service.uuid} 有 ${characteristics.length} 个特征`, 'info');
+                            
+                            if (characteristics.length === 0) {
+                                this.log(`警告：服务没有任何特征`, 'warning');
+                            }
+                            
+                            for (const char of characteristics) {
+                                this.characteristics.set(char.uuid, char);
+                                
+                                const properties = [];
+                                if (char.properties.read) properties.push('READ');
+                                if (char.properties.write) properties.push('WRITE');
+                                if (char.properties.notify) properties.push('NOTIFY');
+                                if (char.properties.indicate) properties.push('INDICATE');
+                                if (char.properties.writeWithoutResponse) properties.push('WRITE_NO_RSP');
+                                
+                                const charDiv = document.createElement('div');
+                                charDiv.style.marginLeft = '20px';
+                                charDiv.style.fontSize = '14px';
+                                charDiv.style.color = '#666';
+                                charDiv.innerHTML = `特征：${char.uuid} [${properties.join(', ')}]`;
+                                serviceDiv.appendChild(charDiv);
+                                
+                                const option = document.createElement('option');
+                                option.value = char.uuid;
+                                option.text = `${char.uuid} [${properties.join(', ')}]`;
+                                characteristicSelect.appendChild(option);
+                            }
+                        } catch (error) {
+                            this.log(`获取特征失败：${error.message}`, 'warning');
+                        }
+                    }
+                    
+                    this.log(`发现 ${services.length} 个服务，${this.characteristics.size} 个特征`, 'info');
+                    this.enableDataControls();
+                    
+                } catch (error) {
+                    this.log(`服务发现失败：${error.message}`, 'error');
+                    this.stats.errorCount++;
+                    this.updateStats();
+                }
+            }
+
+            async writeData() {
+                try {
+                    const charUuid = document.getElementById('characteristicSelect').value;
+                    const data = document.getElementById('sendData').value;
+                    const format = document.getElementById('dataFormat').value;
+                    
+                    if (!charUuid) {
+                        this.log('请选择特征', 'warning');
+                        return;
+                    }
+                    
+                    const characteristic = this.characteristics.get(charUuid);
+                    if (!characteristic) {
+                        this.log('特征未找到', 'error');
+                        return;
+                    }
+                    
+                    let buffer;
+                    
+                    switch (format) {
+                        case 'hex':
+                            const hex = data.replace(/\s/g, '');
+                            const bytes = hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16));
+                            buffer = new Uint8Array(bytes).buffer;
+                            break;
+                        case 'json':
+                            const jsonStr = JSON.stringify(JSON.parse(data));
+                            buffer = new TextEncoder().encode(jsonStr).buffer;
+                            break;
+                        case 'binary':
+                            const binaryBytes = data.split(',').map(b => parseInt(b.trim()));
+                            buffer = new Uint8Array(binaryBytes).buffer;
+                            break;
+                        default: // text
+                            buffer = new TextEncoder().encode(data).buffer;
+                    }
+                    
+                    await characteristic.writeValue(buffer);
+                    
+                    this.stats.bytesSent += buffer.byteLength;
+                    this.updateStats();
+                    
+                    this.log(`已写入 ${buffer.byteLength} 字节到 ${charUuid}`, 'info');
+                    
+                } catch (error) {
+                    this.log(`写入失败：${error.message}`, 'error');
+                    this.stats.errorCount++;
+                    this.updateStats();
+                }
+            }
+
+            async readData() {
+                try {
+                    const charUuid = document.getElementById('characteristicSelect').value;
+                    
+                    if (!charUuid) {
+                        this.log('请选择特征', 'warning');
+                        return;
+                    }
+                    
+                    const characteristic = this.characteristics.get(charUuid);
+                    if (!characteristic) {
+                        this.log('特征未找到', 'error');
+                        return;
+                    }
+                    
+                    const value = await characteristic.readValue();
+                    const decoder = new TextDecoder();
+                    const text = decoder.decode(value);
+                    const hex = Array.from(new Uint8Array(value.buffer))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join(' ');
+                    
+                    this.stats.bytesReceived += value.byteLength;
+                    this.updateStats();
+                    
+                    this.log(`读取到数据 (${value.byteLength} 字节):`, 'info');
+                    this.log(`  文本：${text}`, 'info');
+                    this.log(`  HEX: ${hex}`, 'info');
+                    
+                } catch (error) {
+                    this.log(`读取失败：${error.message}`, 'error');
+                    this.stats.errorCount++;
+                    this.updateStats();
+                }
+            }
+
+            async subscribeToNotifications() {
+                try {
+                    const charUuid = document.getElementById('characteristicSelect').value;
+                    
+                    if (!charUuid) {
+                        this.log('请选择特征', 'warning');
+                        return;
+                    }
+                    
+                    const characteristic = this.characteristics.get(charUuid);
+                    if (!characteristic) {
+                        this.log('特征未找到', 'error');
+                        return;
+                    }
+                    
+                    if (!characteristic.properties.notify && !characteristic.properties.indicate) {
+                        this.log('该特征不支持通知或指示', 'warning');
+                        return;
+                    }
+                    
+                    await characteristic.startNotifications();
+                    
+                    characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                        const value = event.target.value;
+                        const decoder = new TextDecoder();
+                        const text = decoder.decode(value);
+                        const hex = Array.from(new Uint8Array(value.buffer))
+                            .map(b => b.toString(16).padStart(2, '0'))
+                            .join(' ');
+                        
+                        this.stats.bytesReceived += value.byteLength;
+                        this.stats.notificationCount++;
+                        this.updateStats();
+                        
+                        this.log(`收到通知 (${value.byteLength} 字节):`, 'info');
+                        this.log(`  文本：${text}`, 'info');
+                        this.log(`  HEX: ${hex}`, 'info');
+                    });
+                    
+                    this.log(`已订阅 ${charUuid} 的通知`, 'info');
+                    
+                } catch (error) {
+                    this.log(`订阅失败：${error.message}`, 'error');
+                    this.stats.errorCount++;
+                    this.updateStats();
+                }
+            }
+
+            async getAllServices() {
+                try {
+                    this.log('获取所有可用服务...', 'info');
+                    const services = await this.server.getPrimaryServices();
+                    
+                    for (const service of services) {
+                        this.log(`服务：${service.uuid}`, 'info');
+                        
+                        try {
+                            const chars = await service.getCharacteristics();
+                            for (const char of chars) {
+                                const properties = [];
+                                if (char.properties.read) properties.push('R');
+                                if (char.properties.write) properties.push('W');
+                                if (char.properties.notify) properties.push('N');
+                                this.log(`  └─ 特征：${char.uuid} [${properties.join('')}]`, 'info');
+                            }
+                        } catch (e) {
+                            this.log(`  └─ 无法获取特征`, 'warning');
+                        }
+                    }
+                } catch (error) {
+                    this.log(`获取服务失败：${error.message}`, 'error');
+                }
+            }
+
+            async getAllCharacteristics() {
+                try {
+                    this.log('获取所有特征详情...', 'info');
+                    
+                    for (const [uuid, char] of this.characteristics) {
+                        const properties = [];
+                        if (char.properties.read) properties.push('READ');
+                        if (char.properties.write) properties.push('WRITE');
+                        if (char.properties.writeWithoutResponse) properties.push('WRITE_NO_RSP');
+                        if (char.properties.notify) properties.push('NOTIFY');
+                        if (char.properties.indicate) properties.push('INDICATE');
+                        
+                        this.log(`特征 ${uuid}:`, 'info');
+                        this.log(`  属性：${properties.join(', ')}`, 'info');
+                        
+                        if (char.properties.read) {
+                            try {
+                                const value = await char.readValue();
+                                const hex = Array.from(new Uint8Array(value.buffer))
+                                    .map(b => b.toString(16).padStart(2, '0'))
+                                    .join(' ');
+                                this.log(`  当前值：${hex}`, 'info');
+                            } catch (e) {
+                                this.log(`  无法读取值`, 'warning');
+                            }
+                        }
+                    }
+                } catch (error) {
+                    this.log(`获取特征失败：${error.message}`, 'error');
+                }
+            }
+
+            async performanceTest() {
+                try {
+                    this.log('开始性能测试...', 'info');
+                    
+                    // 测试不同的数据包大小
+                    const packetSizes = [20, 100, 185, 244,500]; // 常见的 BLE MTU 值
+                    const iterations = 100;
+                    let writeChar = null;
+                    let useWriteWithoutResponse = false;
+                    
+                    // 找到支持 writeWithoutResponse 的特征（性能更好）
+                    for (const [uuid, char] of this.characteristics) {
+                        if (char.properties.writeWithoutResponse) {
+                            writeChar = char;
+                            useWriteWithoutResponse = true;
+                            this.log(`使用特征 ${uuid} (WriteWithoutResponse)`, 'info');
+                            break;
+                        } else if (char.properties.write) {
+                            writeChar = char;
+                            this.log(`使用特征 ${uuid} (Write)`, 'info');
+                        }
+                    }
+                    
+                    if (!writeChar) {
+                        this.log('没有找到可写特征', 'warning');
+                        return;
+                    }
+                    
+                    // 测试不同包大小
+                    for (const size of packetSizes) {
+                        this.log(`\n测试包大小：${size} 字节`, 'info');
+                        const testData = new Uint8Array(size).fill(0x42);
+                        
+                        try {
+                            const startTime = performance.now();
+                            let successCount = 0;
+                            
+                            for (let i = 0; i < iterations; i++) {
+                                try {
+                                    if (useWriteWithoutResponse) {
+                                        await writeChar.writeValueWithoutResponse(testData);
+                                    } else {
+                                        await writeChar.writeValueWithResponse(testData);
+                                    }
+                                    successCount++;
+                                    if (i % 20 === 0) {
+                                        this.log(`  进度: ${i}/${iterations}`, 'info');
+                                    }
+                                } catch (e) {
+                                    // 如果包太大，跳过
+                                    if (e.message.includes('too large') || e.message.includes('MTU')) {
+                                        this.log(`  包大小 ${size} 超过 MTU 限制`, 'warning');
+                                        break;
+                                    }
+                                    throw e;
+                                }
+                            }
+                            
+                            if (successCount > 0) {
+                                const endTime = performance.now();
+                                const totalTime = endTime - startTime;
+                                const avgTime = totalTime / successCount;
+                                const throughput = (testData.byteLength * successCount * 1000) / totalTime;
+                                
+                                this.log(`  成功发送：${successCount} 个包`, 'info');
+                                this.log(`  总时间：${totalTime.toFixed(2)} ms`, 'info');
+                                this.log(`  平均延迟：${avgTime.toFixed(2)} ms`, 'info');
+                                this.log(`  吞吐量：${throughput.toFixed(2)} bytes/s`, 'success');
+                            }
+                        } catch (error) {
+                            this.log(`  测试失败：${error.message}`, 'error');
+                        }
+                    }
+                    
+                    this.log('\n性能测试完成！', 'success');
+                    this.log('提示：使用 WriteWithoutResponse 和较大的包可以获得更好的性能', 'info');
+                    
+                } catch (error) {
+                    this.log(`性能测试失败：${error.message}`, 'error');
+                }
+            }
+
+            async runBatchCommands() {
+                try {
+                    const commands = document.getElementById('batchCommands').value.split('\n');
+                    
+                    this.log('开始执行批量命令...', 'info');
+                    
+                    for (const command of commands) {
+                        if (!command.trim()) continue;
+                        
+                        const parts = command.split(':');
+                        const action = parts[0].toUpperCase();
+                        
+                        switch (action) {
+                            case 'WRITE':
+                                const writeUuid = parts[1];
+                                const writeData = parts[2];
+                                const writeChar = this.characteristics.get(writeUuid);
+                                if (writeChar) {
+                                    await writeChar.writeValue(new TextEncoder().encode(writeData));
+                                    this.log(`WRITE ${writeUuid}: ${writeData}`, 'info');
+                                }
+                                break;
+                                
+                            case 'READ':
+                                const readUuid = parts[1];
+                                const readChar = this.characteristics.get(readUuid);
+                                if (readChar) {
+                                    const value = await readChar.readValue();
+                                    const text = new TextDecoder().decode(value);
+                                    this.log(`READ ${readUuid}: ${text}`, 'info');
+                                }
+                                break;
+                                
+                            case 'WAIT':
+                                const ms = parseInt(parts[1]);
+                                await new Promise(resolve => setTimeout(resolve, ms));
+                                this.log(`WAIT ${ms}ms`, 'info');
+                                break;
+                                
+                            case 'NOTIFY':
+                                const notifyUuid = parts[1];
+                                const notifyChar = this.characteristics.get(notifyUuid);
+                                if (notifyChar && notifyChar.properties.notify) {
+                                    await notifyChar.startNotifications();
+                                    this.log(`NOTIFY ${notifyUuid}: 已启动`, 'info');
+                                }
+                                break;
+                        }
+                    }
+                    
+                    this.log('批量命令执行完成', 'info');
+                    
+                } catch (error) {
+                    this.log(`批量执行失败：${error.message}`, 'error');
+                }
+            }
+
+            disconnect() {
+                // 停止自动重连
+                this.autoReconnect = false;
+                this.reconnectAttempts = 0;
+                
+                if (this.device && this.device.gatt.connected) {
+                    this.device.gatt.disconnect();
+                    this.log('已主动断开连接', 'info');
+                }
+                this.onDisconnected();
+            }
+
+            onDisconnected() {
+                // 不清除 device 对象，以便能够重连
+                // this.device = null;  // 注释掉这行
+                this.server = null;
+                this.services.clear();
+                this.characteristics.clear();
+                this.updateConnectionStatus(false);
+                this.disableDataControls();
+                
+                document.getElementById('servicesContainer').innerHTML = '<p style="color: #999;">请先连接设备</p>';
+                document.getElementById('characteristicSelect').innerHTML = '<option value="">请先连接设备</option>';
+            }
+            
+            async attemptReconnect() {
+                this.reconnectAttempts++;
+                this.log(`尝试重新连接... (第 ${this.reconnectAttempts} 次)`, 'info');
+                
+                // 设置延迟重连，使用指数退避算法
+                const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
+                
+                setTimeout(async () => {
+                    try {
+                        if (this.device && !this.device.gatt.connected) {
+                            await this.connectToDevice();
+                            this.reconnectAttempts = 0;
+                            this.log('✅ 重新连接成功！', 'success');
+                            this.startHeartbeatMonitor();
+                        }
+                    } catch (error) {
+                        this.log(`重连失败：${error.message}`, 'error');
+                        
+                        if (this.autoReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+                            this.attemptReconnect();
+                        } else {
+                            this.log('已达到最大重连次数，停止重连', 'error');
+                            this.autoReconnect = false;
+                        }
+                    }
+                }, delay);
+                
+                this.log(`将在 ${delay/1000} 秒后重连`, 'info');
+            }
+            
+            startHeartbeatMonitor() {
+                // 监听心跳消息
+                this.log('💓 开始监测心跳', 'info');
+                this.lastHeartbeat = Date.now();
+            }
+
+            updateConnectionStatus(connected) {
+                const statusIndicator = document.getElementById('statusIndicator');
+                const connectionStatus = document.getElementById('connectionStatus');
+                const deviceInfo = document.getElementById('deviceInfo');
+                const deviceName = document.getElementById('deviceName');
+                const deviceId = document.getElementById('deviceId');
+                
+                if (connected) {
+                    statusIndicator.className = 'status-indicator status-connected';
+                    connectionStatus.textContent = '已连接';
+                    deviceInfo.style.display = 'block';
+                    deviceName.textContent = this.device.name || 'Unknown';
+                    deviceId.textContent = this.device.id || '-';
+                    
+                    document.getElementById('scanBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    document.getElementById('refreshServicesBtn').disabled = false;
+                    document.getElementById('getAllServicesBtn').disabled = false;
+                    document.getElementById('getAllCharacteristicsBtn').disabled = false;
+                    document.getElementById('testPerformanceBtn').disabled = false;
+                    document.getElementById('runBatchBtn').disabled = false;
+                } else {
+                    statusIndicator.className = 'status-indicator status-disconnected';
+                    connectionStatus.textContent = '未连接';
+                    deviceInfo.style.display = 'none';
+                    
+                    document.getElementById('scanBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    document.getElementById('refreshServicesBtn').disabled = true;
+                    document.getElementById('getAllServicesBtn').disabled = true;
+                    document.getElementById('getAllCharacteristicsBtn').disabled = true;
+                    document.getElementById('testPerformanceBtn').disabled = true;
+                    document.getElementById('runBatchBtn').disabled = true;
+                }
+            }
+
+            enableDataControls() {
+                document.getElementById('characteristicSelect').disabled = false;
+                document.getElementById('sendData').disabled = false;
+                document.getElementById('writeBtn').disabled = false;
+                document.getElementById('readBtn').disabled = false;
+                document.getElementById('subscribeBtn').disabled = false;
+            }
+
+            disableDataControls() {
+                document.getElementById('characteristicSelect').disabled = true;
+                document.getElementById('sendData').disabled = true;
+                document.getElementById('writeBtn').disabled = true;
+                document.getElementById('readBtn').disabled = true;
+                document.getElementById('subscribeBtn').disabled = true;
+            }
+
+            disableAllButtons() {
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => btn.disabled = true);
+            }
+
+            log(message, type = 'normal') {
+                const console = document.getElementById('console');
+                const line = document.createElement('div');
+                line.className = `console-line ${type}`;
+                
+                const timestamp = new Date().toLocaleTimeString();
+                line.textContent = `[${timestamp}] ${message}`;
+                
+                console.appendChild(line);
+                console.scrollTop = console.scrollHeight;
+                
+                // 保存日志
+                this.logs.push({
+                    timestamp: new Date().toISOString(),
+                    message,
+                    type
+                });
+            }
+
+            clearConsole() {
+                document.getElementById('console').innerHTML = '';
+                this.log('控制台已清空', 'info');
+            }
+
+            updateStats() {
+                document.getElementById('bytesReceived').textContent = this.stats.bytesReceived;
+                document.getElementById('bytesSent').textContent = this.stats.bytesSent;
+                document.getElementById('notificationCount').textContent = this.stats.notificationCount;
+                document.getElementById('errorCount').textContent = this.stats.errorCount;
+            }
+
+            exportLogs() {
+                const logData = {
+                    exportTime: new Date().toISOString(),
+                    stats: this.stats,
+                    logs: this.logs
+                };
+                
+                const blob = new Blob([JSON.stringify(logData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `bluetooth-debug-logs-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                this.log('日志已导出', 'info');
+            }
+        }
+
+        // 初始化调试器
+        const btDebugger = new BluetoothDebugger();
+    </script>
+</body>
+</html>
