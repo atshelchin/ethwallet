@@ -74,6 +74,7 @@ class BluetoothPeripheralManager: NSObject {
     private var writeCharacteristic: CBMutableCharacteristic?
     private var notifyCharacteristic: CBMutableCharacteristic?
     private var readWriteCharacteristic: CBMutableCharacteristic?
+    private var deviceInfoCharacteristic: CBMutableCharacteristic?
     
     // 连接的中心设备
     private var connectedCentrals = Set<CBCentral>()
@@ -125,9 +126,11 @@ class BluetoothPeripheralManager: NSObject {
             return
         }
         
-        // iOS 会忽略 CBAdvertisementDataLocalNameKey，始终使用系统设备名称
+        // 设置广播数据
+        // 虽然 iOS 会覆盖 LocalName，但我们还是设置它
         let advertisementData: [String: Any] = [
-            CBAdvertisementDataServiceUUIDsKey: [BLEConstants.serviceUUID]
+            CBAdvertisementDataServiceUUIDsKey: [BLEConstants.serviceUUID],
+            CBAdvertisementDataLocalNameKey: "EthWallet-iOS"  // 尝试设置自定义名称
         ]
         
         peripheralManager.startAdvertising(advertisementData)
@@ -266,6 +269,25 @@ class BluetoothPeripheralManager: NSObject {
     
     // MARK: - 私有方法
     
+    private func getDeviceInfoJSON() -> String {
+        // 创建设备信息 JSON
+        let deviceInfo: [String: Any] = [
+            "name": "EthWallet iOS Debug",  // 应用自定义名称
+            "model": UIDevice.current.model,
+            "systemName": UIDevice.current.systemName,
+            "systemVersion": UIDevice.current.systemVersion,
+            "appVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
+            "identifier": UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+        ]
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: deviceInfo, options: []),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
+        }
+        
+        return "{\"name\":\"EthWallet iOS\",\"model\":\"\(UIDevice.current.model)\"}"
+    }
+    
     private func setupService() {
         // 先移除旧服务
         if let oldService = service {
@@ -301,13 +323,23 @@ class BluetoothPeripheralManager: NSObject {
             permissions: [.readable, .writeable]
         )
         
+        // 创建设备信息特征（只读，包含设备名称和型号）
+        let deviceInfo = getDeviceInfoJSON()
+        deviceInfoCharacteristic = CBMutableCharacteristic(
+            type: UUIDManager.shared.deviceInfoCharacteristicUUID,
+            properties: [.read],
+            value: deviceInfo.data(using: .utf8),
+            permissions: [.readable]
+        )
+        
         // 创建服务
         service = CBMutableService(type: BLEConstants.serviceUUID, primary: true)
         service?.characteristics = [
             readCharacteristic!,
             writeCharacteristic!,
             notifyCharacteristic!,
-            readWriteCharacteristic!
+            readWriteCharacteristic!,
+            deviceInfoCharacteristic!
         ]
         
         logger.info("准备添加服务，UUID: \(BLEConstants.serviceUUID)")
@@ -507,6 +539,11 @@ extension BluetoothPeripheralManager: CBPeripheralManagerDelegate {
             peripheral.respond(to: request, withResult: .success)
         } else if request.characteristic.uuid == BLEConstants.readWriteCharacteristicUUID {
             request.value = storedData.count > 0 ? storedData : "No data".data(using: .utf8)
+            peripheral.respond(to: request, withResult: .success)
+        } else if request.characteristic.uuid == UUIDManager.shared.deviceInfoCharacteristicUUID {
+            // 返回设备信息
+            let deviceInfo = getDeviceInfoJSON()
+            request.value = deviceInfo.data(using: .utf8)
             peripheral.respond(to: request, withResult: .success)
         } else {
             peripheral.respond(to: request, withResult: .attributeNotFound)

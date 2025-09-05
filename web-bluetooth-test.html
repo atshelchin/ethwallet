@@ -290,7 +290,7 @@
                         <p style="margin: 0 0 5px 0; color: #333; font-weight: 500;">💡 使用说明</p>
                         <small style="color: #555; line-height: 1.6;">
                             • 点击扫描按钮显示所有附近的蓝牙设备<br>
-                            • iOS 设备显示系统设置中的名称 (如 "shelchin's iPhone")<br>
+                            • iOS 设备显示系统设置中的名称 (如 "shelchin's iPhone" 或 EthWallet-iOS)<br>
                             • 此名称在 iOS 设置 > 通用 > 关于本机 > 名称 中配置<br>
                             • 选择设备后自动发现所有可用服务<br>
                          </small>
@@ -423,6 +423,7 @@
                 this.server = null;
                 this.services = new Map();
                 this.characteristics = new Map();
+                this.deviceInfo = null;  // 存储设备友好信息
                 this.stats = {
                     bytesReceived: 0,
                     bytesSent: 0,
@@ -539,7 +540,9 @@
 
                     this.device = await navigator.bluetooth.requestDevice(options);
                     
-                    this.log(`已选择设备：${this.device.name || 'Unknown'}`, 'info');
+                    // 显示设备的系统名称，但标记为临时
+                    const tempName = this.device.name || '未知设备';
+                    this.log(`已选择设备：${tempName}（正在获取设备信息...）`, 'info');
                     
                     // 监听断开事件
                     this.device.addEventListener('gattserverdisconnected', () => {
@@ -733,6 +736,33 @@
                     }
                     
                     this.log(`发现 ${services.length} 个服务，${this.characteristics.size} 个特征`, 'info');
+                    
+                    // 尝试读取设备信息特征以获取友好名称
+                    const deviceInfoUuid = '6e400006-b5a3-f393-e0a9-e50e24dcca9e';  // 设备信息特征 UUID
+                    const deviceInfoChar = this.characteristics.get(deviceInfoUuid);
+                    
+                    if (deviceInfoChar) {
+                        try {
+                            this.log('正在读取设备信息...', 'info');
+                            const value = await deviceInfoChar.readValue();
+                            const decoder = new TextDecoder();
+                            const deviceInfoJSON = decoder.decode(value);
+                            const deviceInfo = JSON.parse(deviceInfoJSON);
+                            
+                            // 更新设备名称显示
+                            const friendlyName = deviceInfo.name || 'EthWallet iOS';
+                            this.log(`✅ 设备识别成功：${friendlyName}`, 'success');
+                            this.log(`设备型号：${deviceInfo.model} (${deviceInfo.systemName} ${deviceInfo.systemVersion})`, 'info');
+                            
+                            // 更新 UI 显示
+                            document.getElementById('deviceName').textContent = friendlyName;
+                            
+                            // 保存设备信息
+                            this.deviceInfo = deviceInfo;
+                        } catch (e) {
+                            this.log('无法读取设备信息：' + e.message, 'warning');
+                        }
+                    }
                     
                     // 保存成功发现的服务 UUID 到本地存储
                     if (services.length > 0) {

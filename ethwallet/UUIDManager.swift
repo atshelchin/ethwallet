@@ -19,6 +19,7 @@ class UUIDManager {
     private let FIXED_WRITE_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"    // RX Characteristic (写入设备)
     private let FIXED_NOTIFY_UUID = "6E400004-B5A3-F393-E0A9-E50E24DCCA9E"   // Notify Characteristic
     private let FIXED_READWRITE_UUID = "6E400005-B5A3-F393-E0A9-E50E24DCCA9E" // Read/Write Characteristic
+    private let FIXED_DEVICEINFO_UUID = "6E400006-B5A3-F393-E0A9-E50E24DCCA9E" // Device Info Characteristic (新增)
     
     // MARK: - UUID 属性（返回固定值）
     
@@ -40,6 +41,10 @@ class UUIDManager {
     
     var readWriteCharacteristicUUID: CBUUID {
         return CBUUID(string: FIXED_READWRITE_UUID)
+    }
+    
+    var deviceInfoCharacteristicUUID: CBUUID {
+        return CBUUID(string: FIXED_DEVICEINFO_UUID)
     }
     
     private init() {
