@@ -223,25 +223,6 @@ class BluetoothViewModel: ObservableObject {
         addMessage("统计数据已重置", type: .command)
     }
     
-    func resetUUIDs() {
-        // 停止广播
-        if isAdvertising {
-            stopAdvertising()
-        }
-        
-        // 重置 UUID
-        UUIDManager.shared.resetAllUUIDs()
-        
-        // 显示新的 UUID
-        let serviceUUID = UUIDManager.shared.serviceUUID.uuidString
-        addMessage("UUID 已重置", type: .command)
-        addMessage("新服务 UUID: \(serviceUUID)", type: .command)
-        
-        // 重新初始化 PeripheralManager 以使用新的 UUID
-        peripheralManager.stopAdvertising()
-        // 注意：需要等待蓝牙重新就绪后才能开始新的广播
-    }
-    
     func getCurrentUUIDs() -> String {
         return UUIDManager.shared.exportUUIDsAsJSON() ?? "{}"
     }

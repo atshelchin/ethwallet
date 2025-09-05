@@ -548,7 +548,6 @@ struct DataSendView: View {
 struct StatisticsView: View {
     @ObservedObject var viewModel: BluetoothViewModel
     @State private var showingUUIDDetails = false
-    @State private var showingResetConfirmation = false
     
     var body: some View {
         ScrollView {
@@ -596,67 +595,62 @@ struct StatisticsView: View {
                 
                 Divider()
                 
-                // UUID 配置
+                // UUID 信息（固定值）
                 VStack(alignment: .leading, spacing: 15) {
                     HStack {
                         Image(systemName: "key.fill")
                             .font(.title2)
                             .foregroundColor(.indigo)
                         
-                        Text("UUID 配置")
+                        Text("服务标识")
                             .font(.headline)
                         
                         Spacer()
+                        
+                        Text("固定 UUID")
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.indigo.opacity(0.2))
+                            .cornerRadius(8)
                     }
                     
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("当前 UUID 概览")
+                        Text("使用 Nordic UART Service 兼容 UUID")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
                         VStack(alignment: .leading, spacing: 6) {
                             // 服务 UUID
                             HStack {
-                                Text("服务:")
+                                Text("服务 UUID:")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
-                                    .frame(width: 40, alignment: .leading)
                                 
-                                Text(String(UUIDManager.shared.serviceUUID.uuidString.prefix(20)) + "...")
+                                Text("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
                                     .font(.system(.caption2, design: .monospaced))
                                     .lineLimit(1)
                                     .onTapGesture {
                                         UIPasteboard.general.string = UUIDManager.shared.serviceUUID.uuidString
                                         viewModel.showAlert = true
-                                        viewModel.alertMessage = "服务 UUID 已复制"
+                                        viewModel.alertMessage = "服务 UUID 已复制到剪贴板"
                                     }
                             }
                             
-                            // 显示特征数量
-                            Text("4 个特征 UUID")
+                            // 说明
+                            Text("所有设备使用相同 UUID，确保 Web Bluetooth 自动发现")
                                 .font(.caption2)
                                 .foregroundColor(.blue)
                         }
                     }
                     
-                    HStack(spacing: 10) {
-                        Button(action: {
-                            showingUUIDDetails = true
-                        }) {
-                            Label("查看所有", systemImage: "eye")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        
-                        Button(action: {
-                            showingResetConfirmation = true
-                        }) {
-                            Label("重置 UUID", systemImage: "arrow.triangle.2.circlepath")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.orange)
+                    Button(action: {
+                        showingUUIDDetails = true
+                    }) {
+                        Label("查看所有 UUID", systemImage: "list.bullet")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.bordered)
                 }
                 .padding()
                 .background(Color(.systemBackground))
@@ -667,14 +661,6 @@ struct StatisticsView: View {
         }
         .sheet(isPresented: $showingUUIDDetails) {
             UUIDDetailsView()
-        }
-        .alert("重置 UUID", isPresented: $showingResetConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("重置", role: .destructive) {
-                viewModel.resetUUIDs()
-            }
-        } message: {
-            Text("重置后将生成新的 UUID，需要重新配对设备。确定要继续吗？")
         }
     }
 }
@@ -724,6 +710,20 @@ struct UUIDDetailsView: View {
                                     showingCopyAlert = true
                                 }
                         }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ℹ️ 关于固定 UUID")
+                            .font(.headline)
+                            .padding(.top)
+                        
+                        Text("此应用使用固定的 UUID（Nordic UART Service 兼容），所有设备都使用相同的标识符。这样做的好处是：")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text("• Web Bluetooth 可以自动发现服务\n• 无需手动输入 UUID\n• 兼容性更好")
+                            .font(.caption)
+                            .foregroundColor(.blue)
                     }
                     
                     Text("💡 点击任意 UUID 复制到剪贴板")

@@ -293,15 +293,14 @@
                             • iOS 设备显示系统设置中的名称 (如 "shelchin's iPhone")<br>
                             • 此名称在 iOS 设置 > 通用 > 关于本机 > 名称 中配置<br>
                             • 选择设备后自动发现所有可用服务<br>
-                            • 如果无法发现服务，请从 iOS 应用复制服务 UUID
-                        </small>
+                         </small>
                     </div>
                 </div>
                 
-                <div class="control-group">
-                    <label>服务 UUID（可选）</label>
-                    <input type="text" id="serviceUuid" placeholder="从 iOS 应用复制 UUID，或留空自动扫描" value="">
-                    <small style="color: #999;">提示：如果无法发现服务，请输入 iOS 应用显示的服务 UUID</small>
+                <div class="control-group" style="display: none;">
+                    <label>服务 UUID（自动管理）</label>
+                    <input type="text" id="serviceUuid" placeholder="UUID 将自动保存和加载" value="">
+                    <small style="color: #999;">系统会自动管理 UUID，无需手动输入</small>
                 </div>
 
                 <div class="button-group">
@@ -313,6 +312,17 @@
                     </button>
                     <button class="btn btn-danger" id="disconnectBtn" disabled>
                         断开连接
+                    </button>
+                    <button class="btn btn-secondary" onclick="
+                        if(confirm('清除所有保存的 UUID？\n\n这将删除所有历史记录，下次需要重新输入。')) {
+                            localStorage.removeItem('bleServiceUUIDs');
+                            localStorage.removeItem('lastServiceUUID');
+                            document.getElementById('serviceUuid').value = '';
+                            console.log('UUID 缓存已清除');
+                            alert('UUID 缓存已清除，请重新扫描设备');
+                        }
+                    ">
+                        🗑️ 清除缓存
                     </button>
                 </div>
 
@@ -444,12 +454,21 @@
                 document.getElementById('exportLogsBtn').addEventListener('click', () => this.exportLogs());
                 document.getElementById('runBatchBtn').addEventListener('click', () => this.runBatchCommands());
 
+                // 自动加载上次使用的 UUID
+                const lastUUID = localStorage.getItem('lastServiceUUID');
+                if (lastUUID) {
+                    document.getElementById('serviceUuid').value = lastUUID;
+                    this.log(`已加载上次使用的服务 UUID: ${lastUUID}`, 'info');
+                }
+
                 // 检查浏览器支持
                 if (!navigator.bluetooth) {
                     this.log('Web Bluetooth API 不支持！请使用 Chrome 浏览器', 'error');
                     this.disableAllButtons();
                 } else {
                     this.log('Web Bluetooth 调试工具已就绪', 'info');
+                    this.log('✅ 已配置固定服务 UUID: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E', 'success');
+                    this.log('💡 所有设备使用相同的 UUID，确保自动发现服务', 'info');
                 }
             }
 
@@ -459,10 +478,22 @@
                     
                     const serviceUuid = document.getElementById('serviceUuid').value.trim();
                     
-                    // 扫描选项 - 接受所有设备
+                    // 扫描选项 - 接受所有设备并包含所有可能的服务
                     let options = {
                         acceptAllDevices: true,
-                        optionalServices: []
+                        optionalServices: [
+                            // 我们的固定服务 UUID (Nordic UART Service 兼容)
+                            '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                            // 添加一些通用的 BLE 服务 UUID
+                            // 'generic_access',
+                            // 'generic_attribute',
+                            // 'device_information',
+                            // 'battery_service',
+                            // 添加一些常见的自定义服务 UUID 范围
+                            // '00000000-0000-1000-8000-00805f9b34fb',
+                            // '00001800-0000-1000-8000-00805f9b34fb',
+                            // '00001801-0000-1000-8000-00805f9b34fb'
+                        ]
                     };
                     
                     // 如果提供了服务 UUID，添加到 optionalServices
@@ -470,14 +501,41 @@
                         try {
                             // 验证 UUID 格式
                             const uuid = serviceUuid.toLowerCase();
-                            options.optionalServices.push(uuid);
-                            this.log(`已添加服务 UUID: ${uuid}`, 'info');
+                            // 确保不重复添加
+                            if (!options.optionalServices.includes(uuid)) {
+                                options.optionalServices.push(uuid);
+                            }
+                            this.log(`已添加自定义服务 UUID: ${uuid}`, 'info');
                         } catch (e) {
                             this.log(`UUID 格式错误：${serviceUuid}`, 'warning');
                         }
                     }
                     
-                    this.log('扫描选项：接受所有设备', 'info');
+                    // 尝试从本地存储获取之前成功连接的 UUID
+                    const savedUUIDs = localStorage.getItem('bleServiceUUIDs');
+                    if (savedUUIDs) {
+                        try {
+                            const uuids = JSON.parse(savedUUIDs);
+                            uuids.forEach(uuid => {
+                                const cleanUuid = uuid.toLowerCase().trim();
+                                if (!options.optionalServices.includes(cleanUuid)) {
+                                    options.optionalServices.push(cleanUuid);
+                                    this.log(`添加历史服务 UUID: ${cleanUuid}`, 'info');
+                                }
+                            });
+                        } catch (e) {
+                            console.error('Failed to parse saved UUIDs:', e);
+                        }
+                    }
+                    
+                    // 确保加载最后使用的 UUID
+                    const lastUUID = localStorage.getItem('lastServiceUUID');
+                    if (lastUUID && !options.optionalServices.includes(lastUUID.toLowerCase())) {
+                        options.optionalServices.push(lastUUID.toLowerCase());
+                        this.log(`添加上次使用的 UUID: ${lastUUID}`, 'info');
+                    }
+                    
+                    this.log(`扫描选项：接受所有设备，包含 ${options.optionalServices.length} 个可选服务`, 'info');
 
                     this.device = await navigator.bluetooth.requestDevice(options);
                     
@@ -545,6 +603,7 @@
                     let services = [];
                     const serviceUuid = document.getElementById('serviceUuid').value.trim();
                     
+                    console.log({serviceUuid,services})
                     // 如果提供了服务 UUID，先尝试获取特定服务
                     if (serviceUuid) {
                         try {
@@ -564,13 +623,46 @@
                             this.log('尝试获取所有可用服务...', 'info');
                             services = await this.server.getPrimaryServices();
                             this.log(`发现 ${services.length} 个服务`, 'info');
+                            console.log("000",services)
                             
                             if (services.length === 0) {
                                 this.log('⚠️ 没有发现任何服务！', 'warning');
-                                this.log('解决方案：', 'info');
-                                this.log('  1. 从 iOS 应用复制服务 UUID', 'info');
-                                this.log('  2. 将 UUID 粘贴到上方输入框', 'info');
-                                this.log('  3. 重新扫描并连接设备', 'info');
+                                this.log('Web Bluetooth 限制：必须在扫描时声明要访问的服务', 'warning');
+                                
+                                // 自动提示用户输入 UUID
+                                const userUUID = prompt('请输入 iOS 应用"设置"页显示的服务 UUID：\n\n例如：12345678-1234-1234-1234-123456789012\n\n提示：打开 iOS 应用 → 设置标签 → 查看"服务 UUID"');
+                                if (userUUID && userUUID.trim()) {
+                                    const cleanUUID = userUUID.trim().toLowerCase();
+                                    this.log(`保存 UUID: ${cleanUUID}`, 'info');
+                                    
+                                    // 保存 UUID
+                                    document.getElementById('serviceUuid').value = cleanUUID;
+                                    localStorage.setItem('lastServiceUUID', cleanUUID);
+                                    
+                                    // 添加到已知服务列表
+                                    let savedUUIDs = [];
+                                    try {
+                                        const existing = localStorage.getItem('bleServiceUUIDs');
+                                        if (existing) {
+                                            savedUUIDs = JSON.parse(existing);
+                                        }
+                                    } catch (e) {}
+                                    
+                                    if (!savedUUIDs.includes(cleanUUID)) {
+                                        savedUUIDs.push(cleanUUID);
+                                        localStorage.setItem('bleServiceUUIDs', JSON.stringify(savedUUIDs));
+                                    }
+                                    
+                                    this.log('✅ UUID 已保存，正在自动重新连接...', 'success');
+                                    
+                                    // 自动断开并重新连接
+                                    setTimeout(async () => {
+                                        await this.disconnect();
+                                        setTimeout(() => {
+                                            this.scanDevice();
+                                        }, 500);
+                                    }, 100);
+                                }
                             } else {
                                 this.log('服务列表：', 'info');
                                 for (const s of services) {
@@ -641,6 +733,18 @@
                     }
                     
                     this.log(`发现 ${services.length} 个服务，${this.characteristics.size} 个特征`, 'info');
+                    
+                    // 保存成功发现的服务 UUID 到本地存储
+                    if (services.length > 0) {
+                        const serviceUUIDs = services.map(s => s.uuid);
+                        try {
+                            localStorage.setItem('bleServiceUUIDs', JSON.stringify(serviceUUIDs));
+                            this.log('已保存服务 UUID 供下次使用', 'info');
+                        } catch (e) {
+                            console.error('Failed to save UUIDs:', e);
+                        }
+                    }
+                    
                     this.enableDataControls();
                     
                 } catch (error) {
